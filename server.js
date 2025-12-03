@@ -15,6 +15,11 @@ if (!BEARER_TOKEN) {
 // Middleware to parse JSON bodies
 app.use(express.json());
 
+// Health check endpoint (no auth required) - must be defined before auth middleware
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'ollama-proxy' });
+});
+
 // Bearer token authentication middleware
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -32,8 +37,13 @@ const authenticate = (req, res, next) => {
   next();
 };
 
-// Apply authentication to all routes
-app.use(authenticate);
+// Apply authentication to all routes except /health
+app.use((req, res, next) => {
+  if (req.path === '/health') {
+    return next();
+  }
+  authenticate(req, res, next);
+});
 
 // Proxy configuration
 const proxyOptions = {
@@ -66,11 +76,6 @@ const proxyOptions = {
 
 // Proxy all /api/* routes to Ollama
 app.use('/api', createProxyMiddleware(proxyOptions));
-
-// Health check endpoint (no auth required)
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'ollama-proxy' });
-});
 
 // Root endpoint
 app.get('/', (req, res) => {
